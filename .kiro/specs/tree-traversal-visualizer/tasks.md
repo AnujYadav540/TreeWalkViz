@@ -1,0 +1,172 @@
+# Implementation Plan
+
+- [x] 1. Set up project structure and core data models
+  - [x] 1.1 Create the single HTML file with basic structure (HTML skeleton, CSS section, JS section)
+    - Set up semantic HTML structure with panels for tree, code, stack, and controls
+    - Add CSS reset and base styling
+    - _Requirements: 7.1, 7.2_
+  - [x] 1.2 Implement Binary Tree data model and default tree creation
+    - Create TreeNode class with value, left, right, x, y properties
+    - Implement createDefaultTree() function returning 7-node balanced tree
+    - Implement computeNodePositions() for layout calculation
+    - _Requirements: 1.1_
+  - [x] 1.3 Write property test for node rendering completeness
+    - **Property 2: Node Rendering Completeness**
+    - **Validates: Requirements 1.3, 1.4**
+
+- [x] 2. Implement execution step model and traversal generators
+  - [x] 2.1 Define ExecutionStep and related enums
+    - Create StepType enum (CALL, CHECK_NULL, PROCESS_NODE, RECURSE_LEFT, RECURSE_RIGHT, RETURN)
+    - Create NodeState enum (UNVISITED, PROCESSING, VISITED, FINISHED)
+    - Define ExecutionStep interface with type, nodeValue, codeLine, stackAction, nodeState
+    - _Requirements: 5.1_
+  - [x] 2.2 Implement InorderGenerator
+    - Generate step-by-step execution sequence for inorder traversal
+    - Map each step to correct code line number
+    - _Requirements: 2.1, 6.1_
+  - [x] 2.3 Implement PreorderGenerator
+    - Generate step-by-step execution sequence for preorder traversal
+    - Map each step to correct code line number
+    - _Requirements: 2.1, 6.1_
+  - [x] 2.4 Implement PostorderGenerator
+    - Generate step-by-step execution sequence for postorder traversal
+    - Map each step to correct code line number
+    - _Requirements: 2.1, 6.1_
+  - [x] 2.5 Write property tests for stack operations
+    - **Property 4: Stack Push on Function Call**
+    - **Property 5: Stack Pop on Function Return**
+    - **Validates: Requirements 3.1, 3.2**
+
+- [x] 3. Implement State Manager and History Stack
+  - [x] 3.1 Create StateManager class
+    - Implement getState(), setState() methods
+    - Implement subscriber pattern for UI updates
+    - Define AppState interface with all state properties
+    - _Requirements: 8.1_
+  - [x] 3.2 Implement History Stack for Previous Step functionality
+    - Implement pushHistory(), popHistory(), clearHistory() methods
+    - Store complete state snapshots for each step
+    - _Requirements: 8.1, 8.2, 8.3_
+  - [x] 3.3 Write property test for state snapshot round-trip
+    - **Property 13: State Snapshot Round-Trip**
+    - **Validates: Requirements 8.1, 8.2**
+  - [x] 3.4 Write property test for reset clears history
+    - **Property 14: Reset Clears History**
+    - **Validates: Requirements 8.3**
+
+- [x] 4. Implement Execution Engine
+  - [x] 4.1 Create ExecutionEngine class with core methods
+    - Implement initialize() to set up traversal type and generate steps
+    - Implement nextStep() to advance simulation
+    - Implement previousStep() to revert simulation
+    - Implement reset() to restore initial state
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 4.2 Implement auto-play functionality
+    - Implement play(), pause() methods
+    - Implement setSpeed() for animation timing control
+    - Use requestAnimationFrame or setInterval for smooth playback
+    - _Requirements: 4.5_
+  - [x] 4.3 Write property tests for step navigation
+    - **Property 8: Next Step Advances by One**
+    - **Property 9: Previous Step Reverts by One**
+    - **Property 10: Reset Restores Initial State**
+    - **Validates: Requirements 4.2, 4.3, 4.4**
+
+- [x] 5. Checkpoint - Ensure core logic tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Implement Tree Renderer
+  - [x] 6.1 Create TreeRenderer using Canvas or SVG
+    - Implement render() method to draw tree structure
+    - Draw nodes as circles with values inside
+    - Draw edges connecting parent to children
+    - _Requirements: 1.1, 1.3, 1.4, 7.3_
+  - [x] 6.2 Implement node state coloring
+    - Define color constants for each NodeState
+    - Implement highlightNode() to update individual node colors
+    - Apply smooth color transitions
+    - _Requirements: 1.2_
+  - [x] 6.3 Write property test for node state color mapping
+    - **Property 1: Node State Color Mapping**
+    - **Validates: Requirements 1.2**
+
+- [x] 7. Implement Code Panel Renderer
+  - [x] 7.1 Create CodeRenderer with traversal code templates
+    - Store Java code templates for inorder, preorder, postorder
+    - Implement setTraversalType() to switch displayed code
+    - Render code with line numbers
+    - _Requirements: 2.1, 2.3_
+  - [x] 7.2 Implement line highlighting
+    - Implement highlightLine() to highlight current execution line
+    - Implement clearHighlight() to remove highlighting
+    - Add syntax highlighting for keywords and method names
+    - _Requirements: 2.2, 2.4_
+  - [x] 7.3 Write property test for code line highlighting accuracy
+    - **Property 3: Code Line Highlighting Accuracy**
+    - **Validates: Requirements 2.2**
+
+- [x] 8. Implement Stack Panel Renderer
+  - [x] 8.1 Create StackRenderer for call stack visualization
+    - Implement render() to display stack frames vertically
+    - Show function name and node value in each frame
+    - Style frames to look like stack blocks
+    - _Requirements: 3.3, 3.4_
+  - [x] 8.2 Implement push/pop animations
+    - Implement animatePush() with slide-in animation
+    - Implement animatePop() with slide-out animation
+    - Use CSS transitions for smooth effects
+    - _Requirements: 3.1, 3.2, 3.5_
+  - [x] 8.3 Write property tests for stack rendering
+    - **Property 6: Stack Frame Contains Node Value**
+    - **Property 7: Stack Visual Order is LIFO**
+    - **Validates: Requirements 3.3, 3.4**
+
+- [x] 9. Implement Controls Panel and Wire Up UI
+  - [x] 9.1 Create control buttons and speed slider
+    - Add Start, Next Step, Previous Step, Reset buttons
+    - Add speed slider with range input
+    - Add traversal type selector (radio buttons or dropdown)
+    - _Requirements: 4.1, 4.5, 6.1_
+  - [x] 9.2 Wire up event handlers to Execution Engine
+    - Connect button clicks to engine methods
+    - Connect slider changes to setSpeed()
+    - Connect traversal selector to initialize()
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [x] 9.3 Implement button state management
+    - Disable Previous at start, Next at end
+    - Toggle Start/Pause button text during playback
+    - Enable/disable based on current state
+    - _Requirements: 4.1, 4.2, 4.3_
+
+- [x] 10. Implement Synchronization Layer
+  - [x] 10.1 Create synchronization logic between components
+    - Subscribe all renderers to StateManager
+    - Ensure tree, code, and stack update atomically on state change
+    - Coordinate animations to complete before next step
+    - _Requirements: 5.1, 5.2, 5.3_
+  - [x] 10.2 Implement traversal type switching with reset
+    - Reset state when traversal type changes
+    - Update code panel and regenerate steps
+    - Clear stack and reset node states
+    - _Requirements: 6.2_
+  - [x] 10.3 Write property test for synchronized component state
+    - **Property 11: Synchronized Component State**
+    - **Validates: Requirements 5.1, 5.2, 5.3**
+  - [x] 10.4 Write property test for traversal type switch
+    - **Property 12: Traversal Type Switch Resets State**
+    - **Validates: Requirements 6.2**
+
+- [x] 11. Final styling and polish
+  - [x] 11.1 Apply final CSS styling
+    - Style panels with appropriate spacing and borders
+    - Add responsive layout for different screen sizes
+    - Apply consistent color scheme and typography
+    - _Requirements: 7.1_
+  - [x] 11.2 Add visual polish and accessibility
+    - Add hover states for buttons
+    - Ensure keyboard navigation works
+    - Add ARIA labels for accessibility
+    - _Requirements: 7.4_
+
+- [x] 12. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

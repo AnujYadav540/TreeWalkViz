@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tree Traversal Visualizer</title>
+    <style>
+        /* CSS Reset */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Base Styles */
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-panel: #0f3460;
+            --text-primary: #eaeaea;
+            --text-secondary: #a0a0a0;
+            --accent-primary: #e94560;
+            --accent-secondary: #0f4c75;
+            --node-unvisited: #4a5568;
+            --node-processing: #ecc94b;
+            --node-visited: #4299e1;
+            --node-finished: #48bb78;
+            --code-highlight: rgba(233, 69, 96, 0.3);
+            --border-color: #2d3748;
+            --button-bg: #e94560;
+            --button-hover: #ff6b6b;
+            --button-disabled: #4a5568;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* Main Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 280px;
+            grid-template-rows: 1fr auto auto;
+            gap: 16px;
+            height: 100vh;
+            padding: 16px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Panel Base Styles */
+        .panel {
+            background-color: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            background-color: var(--bg-secondary);
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 16px;
+            overflow: auto;
+        }
+
+        /* Code Panel (Left) */
+        .code-panel {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .code-container {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .code-line {
+            display: flex;
+            padding: 2px 8px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        .code-line.highlighted {
+            background-color: var(--code-highlight);
+        }
+
+        .line-number {
+            color: var(--text-secondary);
+            width: 24px;
+            text-align: right;
+            margin-right: 16px;
+            user-select: none;
+        }
+
+        .code-text {
+            flex: 1;
+        }
+
+        /* Syntax Highlighting */
+        .keyword { color: #c792ea; }
+        .type { color: #82aaff; }
+        .method { color: #82aaff; }
+        .variable { color: #f78c6c; }
+        .comment { color: #546e7a; }
+
+        /* Legend Panel (Below Code) */
+        .legend-panel {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .legend-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .legend-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legend-dot.unvisited { background-color: var(--node-unvisited); }
+        .legend-dot.processing { background-color: var(--node-processing); }
+        .legend-dot.visited { background-color: var(--node-visited); }
+        .legend-dot.finished { background-color: var(--node-finished); }
+
+        .legend-text {
+            color: var(--text-secondary);
+        }
+
+        .legend-text strong {
+            color: var(--text-primary);
+        }
+
+        /* Tree Panel (Center) */
+        .tree-panel {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .tree-canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #tree-canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Stack Panel (Right) */
+        .stack-panel {
+            grid-column: 3;
+            grid-row: 1;
+        }
+
+        .stack-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        /* Output Panel (Below Stack) */
+        .output-panel {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .output-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: flex-start;
+            align-content: flex-start;
+        }
+
+        .output-value {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--node-finished), #2f855a);
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 16px;
+            color: white;
+            animation: popIn 0.3s ease-out;
+            box-shadow: 0 2px 8px rgba(72, 187, 120, 0.4);
+        }
+
+        @keyframes popIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            70% {
+                transform: scale(1.1);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .output-empty {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        .output-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stack-frame {
+            background: linear-gradient(135deg, var(--accent-secondary), var(--bg-secondary));
+            border: 2px solid var(--accent-primary);
+            border-radius: 8px;
+            padding: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .stack-frame.popping {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+
+        .frame-function {
+            font-family: 'Consolas', monospace;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 4px;
+        }
+
+        .frame-variable {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stack-empty {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        /* Description Panel */
+        .description-panel {
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        .step-description {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .description-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.1), rgba(15, 76, 117, 0.2));
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-primary);
+            min-height: 60px;
+        }
+
+        .description-text strong {
+            color: var(--accent-primary);
+        }
+
+        .description-text .node-value {
+            color: var(--node-processing);
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .description-text .action-type {
+            color: #82aaff;
+            font-weight: 600;
+        }
+
+        .step-counter {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        /* Controls Panel (Bottom) */
+        .controls-panel {
+            grid-column: 1 / -1;
+            grid-row: 3;
+        }
+
+        .controls-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .control-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: var(--button-bg);
+            color: white;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: var(--button-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn:focus {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+
+        .btn:focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+
+        .btn:disabled {
+            background-color: var(--button-disabled);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-secondary {
+            background-color: var(--accent-secondary);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #1a6a9e;
+        }
+
+        /* Speed Slider */
+        .speed-slider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .speed-slider input[type="range"] {
+            width: 120px;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .speed-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .speed-slider input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Traversal Type Selector */
+        .traversal-selector {
+            display: flex;
+            gap: 8px;
+        }
+
+        .traversal-selector input[type="radio"] {
+            display: none;
+        }
+
+        .traversal-selector label {
+            padding: 8px 16px;
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        .traversal-selector input[type="radio"]:checked + label {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .traversal-selector input[type="radio"]:focus + label {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+
+        .traversal-selector label:hover {
+            border-color: var(--accent-primary);
+        }
+
+        /* Slider focus state */
+        .speed-slider input[type="range"]:focus {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .app-container {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto 1fr auto auto auto;
+            }
+
+            .code-panel {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            .legend-panel {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            .stack-panel {
+                grid-column: 2;
+                grid-row: 1 / 3;
+            }
+
+            .tree-panel {
+                grid-column: 1 / -1;
+                grid-row: 3;
+                min-height: 300px;
+            }
+
+            .output-panel {
+                grid-column: 1 / -1;
+                grid-row: 4;
+            }
+
+            .description-panel {
+                grid-column: 1 / -1;
+                grid-row: 5;
+            }
+
+            .controls-panel {
+                grid-column: 1 / -1;
+                grid-row: 6;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto auto auto auto auto auto;
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .code-panel { grid-column: 1; grid-row: 1; }
+            .legend-panel { grid-column: 1; grid-row: 2; }
+            .tree-panel { grid-column: 1; grid-row: 3; min-height: 250px; }
+            .stack-panel { grid-column: 1; grid-row: 4; max-height: 200px; }
+            .output-panel { grid-column: 1; grid-row: 5; }
+            .description-panel { grid-column: 1; grid-row: 6; }
+            .controls-panel { grid-column: 1; grid-row: 7; }
+
+            .controls-content {
+                flex-direction: column;
+                gap: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Code Panel (Left) -->
+        <div class="panel code-panel">
+            <div class="panel-header">Code</div>
+            <div class="panel-content">
+                <div id="code-container" class="code-container">
+                    <!-- Code lines will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend Panel (Below Code) -->
+        <div class="panel legend-panel">
+            <div class="panel-header">🎨 Node Colors</div>
+            <div class="panel-content">
+                <div class="legend-container">
+                    <div class="legend-item">
+                        <span class="legend-dot unvisited"></span>
+                        <span class="legend-text"><strong>Gray</strong> — Not yet visited</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot processing"></span>
+                        <span class="legend-text"><strong>Yellow</strong> — Currently processing</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot visited"></span>
+                        <span class="legend-text"><strong>Blue</strong> — In call stack</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot finished"></span>
+                        <span class="legend-text"><strong>Green</strong> — Fully processed</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tree Panel (Center) -->
+        <div class="panel tree-panel">
+            <div class="panel-header">Binary Tree</div>
+            <div class="panel-content">
+                <div class="tree-canvas-container">
+                    <canvas id="tree-canvas" width="650" height="480"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stack Panel (Right) -->
+        <div class="panel stack-panel">
+            <div class="panel-header">Call Stack</div>
+            <div class="panel-content">
+                <div id="stack-container" class="stack-container">
+                    <div class="stack-empty">Stack is empty</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Panel (Below Stack) -->
+        <div class="panel output-panel">
+            <div class="panel-header">📤 Traversal Output</div>
+            <div class="panel-content">
+                <div class="output-label">Visited nodes in order:</div>
+                <div id="output-container" class="output-container">
+                    <span class="output-empty">No nodes visited yet</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step Description Panel (Below Tree) -->
+        <div class="panel description-panel">
+            <div class="panel-header">📖 What's Happening</div>
+            <div class="panel-content">
+                <div id="step-description" class="step-description">
+                    <div class="description-text">Click <strong>Next →</strong> or <strong>▶ Start</strong> to begin the traversal visualization.</div>
+                    <div class="step-counter" id="step-counter">Step: 0 / 0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Panel (Bottom) -->
+        <div class="panel controls-panel">
+            <div class="panel-content controls-content">
+                <!-- Traversal Type Selector -->
+                <div class="control-group">
+                    <span class="control-label">Traversal:</span>
+                    <div class="traversal-selector">
+                        <input type="radio" id="inorder" name="traversal" value="inorder" checked>
+                        <label for="inorder">Inorder</label>
+                        <input type="radio" id="preorder" name="traversal" value="preorder">
+                        <label for="preorder">Preorder</label>
+                        <input type="radio" id="postorder" name="traversal" value="postorder">
+                        <label for="postorder">Postorder</label>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="control-group">
+                    <button id="btn-prev" class="btn btn-secondary" disabled aria-label="Previous Step">
+                        ← Prev
+                    </button>
+                    <button id="btn-play" class="btn" aria-label="Start/Pause">
+                        ▶ Start
+                    </button>
+                    <button id="btn-next" class="btn btn-secondary" aria-label="Next Step">
+                        Next →
+                    </button>
+                    <button id="btn-reset" class="btn btn-secondary" aria-label="Reset">
+                        ↺ Reset
+                    </button>
+                </div>
+
+                <!-- Speed Slider -->
+                <div class="control-group speed-slider">
+                    <span class="control-label">Speed:</span>
+                    <input type="range" id="speed-slider" min="500" max="3000" value="1500" 
+                           aria-label="Animation Speed">
+                    <span id="speed-value">1500ms</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // JAVASCRIPT SECTION - Tree Traversal Visualizer
+        // ============================================================
+
+        // ============================================================
+        // 1. BINARY TREE MODEL
+        // ============================================================
+
+        /**
+         * Represents a node in the binary tree
+         */
+        class TreeNode {
+            constructor(value, left = null, right = null) {
+                this.value = value;
+                this.left = left;
+                this.right = right;
+                this.x = 0;  // Computed x position for rendering
+                this.y = 0;  // Computed y position for rendering
+            }
+        }
+
+        /**
+         * Creates the default 7-node binary tree
+         * Structure:
+         *        4
+         *       / \
+         *      2   6
+         *     / \ / \
+         *    1  3 5  7
+         */
+        function createDefaultTree() {
+            const root = new TreeNode(4);
+            root.left = new TreeNode(2);
+            root.right = new TreeNode(6);
+            root.left.left = new TreeNode(1);
+            root.left.right = new TreeNode(3);
+            root.right.left = new TreeNode(5);
+            root.right.right = new TreeNode(7);
+            return root;
+        }
+
+        /**
+         * Computes x,y positions for all nodes based on canvas dimensions
+         * Uses a level-order layout where:
+         * - Root is centered horizontally
+         * - Each level doubles the horizontal spread
+         * - Vertical spacing is fixed between levels
+         * 
+         * @param {TreeNode} root - The root of the tree
+         * @param {number} width - Canvas width
+         * @param {number} height - Canvas height
+         */
+        function computeNodePositions(root, width, height) {
+            if (!root) return;
+
+            const verticalSpacing = height / 4;  // Space between levels
+            const nodeRadius = 42;
+            const topPadding = nodeRadius + 20;
+
+            // Helper function to compute positions recursively
+            function computePositions(node, level, leftBound, rightBound) {
+                if (!node) return;
+
+                // Center the node horizontally within its bounds
+                const x = (leftBound + rightBound) / 2;
+                const y = topPadding + level * verticalSpacing;
+
+                node.x = x;
+                node.y = y;
+
+                // Recursively position children
+                const midpoint = (leftBound + rightBound) / 2;
+                computePositions(node.left, level + 1, leftBound, midpoint);
+                computePositions(node.right, level + 1, midpoint, rightBound);
+            }
+
+            computePositions(root, 0, 0, width);
+        }
+
+        /**
+         * Gets all nodes in the tree as a flat array (for iteration)
+         * @param {TreeNode} root - The root of the tree
+         * @returns {TreeNode[]} Array of all nodes
+         */
+        function getAllNodes(root) {
+            const nodes = [];
+            function traverse(node) {
+                if (!node) return;
+                nodes.push(node);
+                traverse(node.left);
+                traverse(node.right);
+            }
+            traverse(root);
+            return nodes;
+        }
+
+        /**
+         * Finds a node by its value
+         * @param {TreeNode} root - The root of the tree
+         * @param {number} value - The value to find
+         * @returns {TreeNode|null} The found node or null
+         */
+        function findNode(root, value) {
+            if (!root) return null;
+            if (root.value === value) return root;
+            return findNode(root.left, value) || findNode(root.right, value);
+        }
+
+        /**
+         * Gets the depth (height) of the tree
+         * @param {TreeNode} root - The root of the tree
+         * @returns {number} The depth of the tree
+         */
+        function getTreeDepth(root) {
+            if (!root) return 0;
+            return 1 + Math.max(getTreeDepth(root.left), getTreeDepth(root.right));
+        }
+
+        /**
+         * Counts the total number of nodes in the tree
+         * @param {TreeNode} root - The root of the tree
+         * @returns {number} The number of nodes
+         */
+        function countNodes(root) {
+            if (!root) return 0;
+            return 1 + countNodes(root.left) + countNodes(root.right);
+        }
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+
+        // Create the default tree and compute positions
+        const tree = createDefaultTree();
+        const canvas = document.getElementById('tree-canvas');
+        computeNodePositions(tree, canvas.width, canvas.height);
+
+        // ============================================================
+        // 2. NODE STATE ENUM
+        // ============================================================
+
+        const NodeState = {
+            UNVISITED: 'unvisited',
+            PROCESSING: 'processing',
+            VISITED: 'visited',
+            FINISHED: 'finished'
+        };
+
+        // ============================================================
+        // 3. TREE RENDERER
+        // ============================================================
+
+        /**
+         * TreeRenderer - Renders the binary tree on a canvas
+         */
+        class TreeRenderer {
+            constructor(canvasElement) {
+                this.canvas = canvasElement;
+                this.ctx = canvasElement.getContext('2d');
+                this.nodeRadius = 42;
+                
+                // Colors for each node state
+                this.colors = {
+                    [NodeState.UNVISITED]: '#4a5568',
+                    [NodeState.PROCESSING]: '#ecc94b',
+                    [NodeState.VISITED]: '#4299e1',
+                    [NodeState.FINISHED]: '#48bb78'
+                };
+                
+                this.edgeColor = '#718096';
+                this.textColor = '#ffffff';
+                this.backgroundColor = '#0f3460';
+            }
+
+            /**
+             * Get color for a node state
+             * @param {string} state - NodeState value
+             * @returns {string} Color hex code
+             */
+            getColorForState(state) {
+                return this.colors[state] || this.colors[NodeState.UNVISITED];
+            }
+
+            /**
+             * Clear the canvas
+             */
+            clear() {
+                this.ctx.fillStyle = this.backgroundColor;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            /**
+             * Draw an edge between two nodes
+             * @param {TreeNode} parent - Parent node
+             * @param {TreeNode} child - Child node
+             */
+            drawEdge(parent, child) {
+                const ctx = this.ctx;
+                
+                ctx.beginPath();
+                ctx.strokeStyle = this.edgeColor;
+                ctx.lineWidth = 2;
+                
+                // Calculate start and end points (from edge of circles)
+                const angle = Math.atan2(child.y - parent.y, child.x - parent.x);
+                const startX = parent.x + Math.cos(angle) * this.nodeRadius;
+                const startY = parent.y + Math.sin(angle) * this.nodeRadius;
+                const endX = child.x - Math.cos(angle) * this.nodeRadius;
+                const endY = child.y - Math.sin(angle) * this.nodeRadius;
+                
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            }
+
+            /**
+             * Draw all edges in the tree
+             * @param {TreeNode} node - Current node
+             */
+            drawEdges(node) {
+                if (!node) return;
+                
+                if (node.left) {
+                    this.drawEdge(node, node.left);
+                    this.drawEdges(node.left);
+                }
+                if (node.right) {
+                    this.drawEdge(node, node.right);
+                    this.drawEdges(node.right);
+                }
+            }
+
+            /**
+             * Draw a single node
+             * @param {TreeNode} node - Node to draw
+             * @param {string} state - NodeState for coloring
+             */
+            drawNode(node, state = NodeState.UNVISITED) {
+                const ctx = this.ctx;
+                const color = this.getColorForState(state);
+                
+                // Draw circle with glow effect for processing state
+                if (state === NodeState.PROCESSING) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, this.nodeRadius + 5, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(236, 201, 75, 0.3)';
+                    ctx.fill();
+                }
+                
+                // Draw main circle
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, this.nodeRadius, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                // Draw border
+                ctx.strokeStyle = state === NodeState.PROCESSING ? '#fff' : '#2d3748';
+                ctx.lineWidth = state === NodeState.PROCESSING ? 3 : 2;
+                ctx.stroke();
+                
+                // Draw value text
+                ctx.fillStyle = this.textColor;
+                ctx.font = 'bold 26px Segoe UI, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.value.toString(), node.x, node.y);
+            }
+
+            /**
+             * Draw all nodes in the tree
+             * @param {TreeNode} node - Current node
+             * @param {Map} nodeStates - Map of nodeValue -> NodeState
+             */
+            drawNodes(node, nodeStates) {
+                if (!node) return;
+                
+                const state = nodeStates.get(node.value) || NodeState.UNVISITED;
+                this.drawNode(node, state);
+                
+                this.drawNodes(node.left, nodeStates);
+                this.drawNodes(node.right, nodeStates);
+            }
+
+            /**
+             * Render the complete tree
+             * @param {TreeNode} root - Root of the tree
+             * @param {Map} nodeStates - Map of nodeValue -> NodeState
+             */
+            render(root, nodeStates = new Map()) {
+                this.clear();
+                this.drawEdges(root);
+                this.drawNodes(root, nodeStates);
+            }
+
+            /**
+             * Highlight a specific node (update its state and re-render)
+             * @param {TreeNode} root - Root of the tree
+             * @param {number} value - Node value to highlight
+             * @param {string} state - New NodeState
+             * @param {Map} nodeStates - Current node states map
+             */
+            highlightNode(root, value, state, nodeStates) {
+                nodeStates.set(value, state);
+                this.render(root, nodeStates);
+            }
+        }
+
+        // ============================================================
+        // INITIALIZE RENDERER AND DRAW TREE
+        // ============================================================
+
+        const treeRenderer = new TreeRenderer(canvas);
+        const nodeStates = new Map();
+
+        // Initialize all nodes to unvisited
+        getAllNodes(tree).forEach(node => {
+            nodeStates.set(node.value, NodeState.UNVISITED);
+        });
+
+        // Initial render
+        treeRenderer.render(tree, nodeStates);
+
+        // ============================================================
+        // 4. CODE RENDERER
+        // ============================================================
+
+        /**
+         * Code templates for each traversal type with syntax highlighting
+         */
+        const CODE_TEMPLATES = {
+            inorder: [
+                { text: 'void inOrder(Node node) {', tokens: [
+                    { type: 'keyword', text: 'void' },
+                    { type: 'text', text: ' ' },
+                    { type: 'method', text: 'inOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'type', text: 'Node' },
+                    { type: 'text', text: ' ' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ') {' }
+                ]},
+                { text: '    if (node == null) return;', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'keyword', text: 'if' },
+                    { type: 'text', text: ' (' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ' == ' },
+                    { type: 'keyword', text: 'null' },
+                    { type: 'text', text: ') ' },
+                    { type: 'keyword', text: 'return' },
+                    { type: 'text', text: ';' }
+                ]},
+                { text: '    inOrder(node.left);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'inOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.left);' }
+                ]},
+                { text: '    print(node.val);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'print' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.val);' }
+                ]},
+                { text: '    inOrder(node.right);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'inOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.right);' }
+                ]},
+                { text: '}', tokens: [
+                    { type: 'text', text: '}' }
+                ]}
+            ],
+            preorder: [
+                { text: 'void preOrder(Node node) {', tokens: [
+                    { type: 'keyword', text: 'void' },
+                    { type: 'text', text: ' ' },
+                    { type: 'method', text: 'preOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'type', text: 'Node' },
+                    { type: 'text', text: ' ' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ') {' }
+                ]},
+                { text: '    if (node == null) return;', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'keyword', text: 'if' },
+                    { type: 'text', text: ' (' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ' == ' },
+                    { type: 'keyword', text: 'null' },
+                    { type: 'text', text: ') ' },
+                    { type: 'keyword', text: 'return' },
+                    { type: 'text', text: ';' }
+                ]},
+                { text: '    print(node.val);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'print' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.val);' }
+                ]},
+                { text: '    preOrder(node.left);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'preOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.left);' }
+                ]},
+                { text: '    preOrder(node.right);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'preOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.right);' }
+                ]},
+                { text: '}', tokens: [
+                    { type: 'text', text: '}' }
+                ]}
+            ],
+            postorder: [
+                { text: 'void postOrder(Node node) {', tokens: [
+                    { type: 'keyword', text: 'void' },
+                    { type: 'text', text: ' ' },
+                    { type: 'method', text: 'postOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'type', text: 'Node' },
+                    { type: 'text', text: ' ' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ') {' }
+                ]},
+                { text: '    if (node == null) return;', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'keyword', text: 'if' },
+                    { type: 'text', text: ' (' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: ' == ' },
+                    { type: 'keyword', text: 'null' },
+                    { type: 'text', text: ') ' },
+                    { type: 'keyword', text: 'return' },
+                    { type: 'text', text: ';' }
+                ]},
+                { text: '    postOrder(node.left);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'postOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.left);' }
+                ]},
+                { text: '    postOrder(node.right);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'postOrder' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.right);' }
+                ]},
+                { text: '    print(node.val);', tokens: [
+                    { type: 'text', text: '    ' },
+                    { type: 'method', text: 'print' },
+                    { type: 'text', text: '(' },
+                    { type: 'variable', text: 'node' },
+                    { type: 'text', text: '.val);' }
+                ]},
+                { text: '}', tokens: [
+                    { type: 'text', text: '}' }
+                ]}
+            ]
+        };
+
+        /**
+         * CodeRenderer - Renders code with syntax highlighting and line highlighting
+         */
+        class CodeRenderer {
+            constructor(containerElement) {
+                this.container = containerElement;
+                this.currentType = 'inorder';
+                this.highlightedLine = 0;
+            }
+
+            /**
+             * Get the code template for a traversal type
+             * @param {string} type - Traversal type
+             * @returns {Array} Code template
+             */
+            getTemplate(type) {
+                return CODE_TEMPLATES[type] || CODE_TEMPLATES.inorder;
+            }
+
+            /**
+             * Set the traversal type and re-render
+             * @param {string} type - 'inorder', 'preorder', or 'postorder'
+             */
+            setTraversalType(type) {
+                this.currentType = type;
+                this.highlightedLine = 0;
+                this.render();
+            }
+
+            /**
+             * Highlight a specific line
+             * @param {number} lineNumber - 1-indexed line number (0 for none)
+             */
+            highlightLine(lineNumber) {
+                this.highlightedLine = lineNumber;
+                this.updateHighlight();
+            }
+
+            /**
+             * Clear line highlighting
+             */
+            clearHighlight() {
+                this.highlightedLine = 0;
+                this.updateHighlight();
+            }
+
+            /**
+             * Update highlight without full re-render
+             */
+            updateHighlight() {
+                const lines = this.container.querySelectorAll('.code-line');
+                lines.forEach((line, index) => {
+                    if (index + 1 === this.highlightedLine) {
+                        line.classList.add('highlighted');
+                    } else {
+                        line.classList.remove('highlighted');
+                    }
+                });
+            }
+
+            /**
+             * Render a single token with syntax highlighting
+             * @param {Object} token - Token with type and text
+             * @returns {string} HTML string
+             */
+            renderToken(token) {
+                if (token.type === 'text') {
+                    return this.escapeHtml(token.text);
+                }
+                return `<span class="${token.type}">${this.escapeHtml(token.text)}</span>`;
+            }
+
+            /**
+             * Escape HTML special characters
+             * @param {string} text - Text to escape
+             * @returns {string} Escaped text
+             */
+            escapeHtml(text) {
+                return text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            /**
+             * Render the code panel
+             */
+            render() {
+                const template = this.getTemplate(this.currentType);
+                let html = '';
+
+                template.forEach((line, index) => {
+                    const lineNum = index + 1;
+                    const isHighlighted = lineNum === this.highlightedLine;
+                    const highlightClass = isHighlighted ? ' highlighted' : '';
+
+                    const tokensHtml = line.tokens.map(t => this.renderToken(t)).join('');
+
+                    html += `
+                        <div class="code-line${highlightClass}" data-line="${lineNum}">
+                            <span class="line-number">${lineNum}</span>
+                            <span class="code-text">${tokensHtml}</span>
+                        </div>
+                    `;
+                });
+
+                this.container.innerHTML = html;
+            }
+
+            /**
+             * Get the number of lines in the current template
+             * @returns {number}
+             */
+            getLineCount() {
+                return this.getTemplate(this.currentType).length;
+            }
+
+            /**
+             * Get the current highlighted line
+             * @returns {number}
+             */
+            getHighlightedLine() {
+                return this.highlightedLine;
+            }
+        }
+
+        // ============================================================
+        // INITIALIZE CODE RENDERER
+        // ============================================================
+
+        const codeContainer = document.getElementById('code-container');
+        const codeRenderer = new CodeRenderer(codeContainer);
+        codeRenderer.render();
+
+        // ============================================================
+        // 5. STACK RENDERER
+        // ============================================================
+
+        /**
+         * StackFrame - Represents a single frame in the call stack
+         */
+        class StackFrame {
+            constructor(functionName, nodeValue, returnAddress = 'caller') {
+                this.functionName = functionName;
+                this.nodeValue = nodeValue;
+                this.returnAddress = returnAddress;
+            }
+        }
+
+        /**
+         * StackRenderer - Renders the call stack visualization
+         */
+        class StackRenderer {
+            constructor(containerElement) {
+                this.container = containerElement;
+                this.stack = [];
+                this.animationDuration = 300;
+            }
+
+            /**
+             * Get the current stack
+             * @returns {StackFrame[]}
+             */
+            getStack() {
+                return [...this.stack];
+            }
+
+            /**
+             * Get the stack size
+             * @returns {number}
+             */
+            getStackSize() {
+                return this.stack.length;
+            }
+
+            /**
+             * Check if stack is empty
+             * @returns {boolean}
+             */
+            isEmpty() {
+                return this.stack.length === 0;
+            }
+
+            /**
+             * Get the top frame (most recent call)
+             * @returns {StackFrame|null}
+             */
+            getTopFrame() {
+                if (this.stack.length === 0) return null;
+                return this.stack[this.stack.length - 1];
+            }
+
+            /**
+             * Set the entire stack (for state restoration)
+             * @param {StackFrame[]} stack
+             */
+            setStack(stack) {
+                this.stack = stack.map(f => 
+                    f instanceof StackFrame ? f : new StackFrame(f.functionName, f.nodeValue, f.returnAddress)
+                );
+                this.render();
+            }
+
+            /**
+             * Push a frame onto the stack
+             * @param {StackFrame} frame
+             */
+            push(frame) {
+                this.stack.push(frame);
+                this.render();
+            }
+
+            /**
+             * Pop a frame from the stack
+             * @returns {StackFrame|null}
+             */
+            pop() {
+                if (this.stack.length === 0) return null;
+                const frame = this.stack.pop();
+                this.render();
+                return frame;
+            }
+
+            /**
+             * Clear the stack
+             */
+            clear() {
+                this.stack = [];
+                this.render();
+            }
+
+            /**
+             * Escape HTML special characters
+             * @param {string} text
+             * @returns {string}
+             */
+            escapeHtml(text) {
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            /**
+             * Create HTML for a single stack frame
+             * @param {StackFrame} frame
+             * @param {number} index
+             * @returns {string}
+             */
+            createFrameHTML(frame, index) {
+                const nodeDisplay = frame.nodeValue !== null ? frame.nodeValue : 'null';
+                return `
+                    <div class="stack-frame" data-index="${index}">
+                        <div class="frame-function">${this.escapeHtml(frame.functionName)}(${nodeDisplay})</div>
+                        <div class="frame-variable">node.val = ${nodeDisplay}</div>
+                    </div>
+                `;
+            }
+
+            /**
+             * Render the stack to the container
+             */
+            render() {
+                if (!this.container) return;
+
+                if (this.stack.length === 0) {
+                    this.container.innerHTML = '<div class="stack-empty">Stack is empty</div>';
+                    return;
+                }
+
+                // Render frames in reverse order (top of stack at top of display - LIFO visual)
+                let html = '';
+                for (let i = this.stack.length - 1; i >= 0; i--) {
+                    html += this.createFrameHTML(this.stack[i], i);
+                }
+                this.container.innerHTML = html;
+            }
+
+            /**
+             * Animate pushing a frame onto the stack
+             * @param {StackFrame} frame
+             * @returns {Promise<void>}
+             */
+            async animatePush(frame) {
+                this.stack.push(frame);
+                this.render();
+
+                // Add animation class to the new frame (top of display)
+                const frames = this.container.querySelectorAll('.stack-frame');
+                if (frames.length > 0) {
+                    const newFrame = frames[0];
+                    newFrame.style.animation = 'none';
+                    newFrame.offsetHeight; // Trigger reflow
+                    newFrame.style.animation = 'slideIn 0.3s ease-out';
+                }
+
+                await new Promise(resolve => setTimeout(resolve, this.animationDuration));
+            }
+
+            /**
+             * Animate popping a frame from the stack
+             * @returns {Promise<StackFrame|null>}
+             */
+            async animatePop() {
+                if (this.stack.length === 0) return null;
+
+                // Add animation class to top frame before removing
+                const frames = this.container.querySelectorAll('.stack-frame');
+                if (frames.length > 0) {
+                    const topFrame = frames[0];
+                    topFrame.classList.add('popping');
+                    await new Promise(resolve => setTimeout(resolve, this.animationDuration));
+                }
+
+                const frame = this.stack.pop();
+                this.render();
+                return frame;
+            }
+
+            /**
+             * Get visual order of frames (for testing LIFO display)
+             * @returns {StackFrame[]}
+             */
+            getVisualOrder() {
+                return [...this.stack].reverse();
+            }
+        }
+
+        // ============================================================
+        // INITIALIZE STACK RENDERER
+        // ============================================================
+
+        const stackContainer = document.getElementById('stack-container');
+        const stackRenderer = new StackRenderer(stackContainer);
+        stackRenderer.render();
+
+        // ============================================================
+        // 6. EXECUTION STEP MODEL
+        // ============================================================
+
+        const StepType = {
+            CALL: 'CALL',
+            CHECK_NULL: 'CHECK_NULL',
+            PROCESS_NODE: 'PROCESS_NODE',
+            RECURSE_LEFT: 'RECURSE_LEFT',
+            RECURSE_RIGHT: 'RECURSE_RIGHT',
+            RETURN: 'RETURN'
+        };
+
+        const StackAction = {
+            PUSH: 'push',
+            POP: 'pop',
+            NONE: 'none'
+        };
+
+        class ExecutionStep {
+            constructor({ type, nodeValue, codeLine, stackAction, nodeState, description = '' }) {
+                this.type = type;
+                this.nodeValue = nodeValue;
+                this.codeLine = codeLine;
+                this.stackAction = stackAction;
+                this.nodeState = nodeState;
+                this.description = description;
+            }
+
+            static call(nodeValue, codeLine) {
+                return new ExecutionStep({
+                    type: StepType.CALL,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.PUSH,
+                    nodeState: nodeValue !== null ? NodeState.PROCESSING : NodeState.UNVISITED,
+                    description: nodeValue !== null ? `Call with node ${nodeValue}` : 'Call with null'
+                });
+            }
+
+            static checkNull(nodeValue, codeLine) {
+                return new ExecutionStep({
+                    type: StepType.CHECK_NULL,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.NONE,
+                    nodeState: nodeValue !== null ? NodeState.PROCESSING : NodeState.UNVISITED,
+                    description: nodeValue !== null ? `Check if ${nodeValue} is null (false)` : 'Check if null (true)'
+                });
+            }
+
+            static processNode(nodeValue, codeLine) {
+                return new ExecutionStep({
+                    type: StepType.PROCESS_NODE,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.NONE,
+                    nodeState: NodeState.VISITED,
+                    description: `Process node ${nodeValue}`
+                });
+            }
+
+            static recurseLeft(nodeValue, codeLine) {
+                return new ExecutionStep({
+                    type: StepType.RECURSE_LEFT,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.NONE,
+                    nodeState: NodeState.PROCESSING,
+                    description: `Recurse left from ${nodeValue}`
+                });
+            }
+
+            static recurseRight(nodeValue, codeLine) {
+                return new ExecutionStep({
+                    type: StepType.RECURSE_RIGHT,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.NONE,
+                    nodeState: NodeState.PROCESSING,
+                    description: `Recurse right from ${nodeValue}`
+                });
+            }
+
+            static return(nodeValue, codeLine, isNullReturn = false) {
+                return new ExecutionStep({
+                    type: StepType.RETURN,
+                    nodeValue,
+                    codeLine,
+                    stackAction: StackAction.POP,
+                    nodeState: isNullReturn ? NodeState.UNVISITED : NodeState.FINISHED,
+                    description: nodeValue !== null ? `Return from ${nodeValue}` : 'Return from null'
+                });
+            }
+        }
+
+        // ============================================================
+        // 7. TRAVERSAL GENERATORS
+        // ============================================================
+
+        const INORDER_LINES = { ENTRY: 1, NULL_CHECK: 2, LEFT: 3, PROCESS: 4, RIGHT: 5, EXIT: 6 };
+        const PREORDER_LINES = { ENTRY: 1, NULL_CHECK: 2, PROCESS: 3, LEFT: 4, RIGHT: 5, EXIT: 6 };
+        const POSTORDER_LINES = { ENTRY: 1, NULL_CHECK: 2, LEFT: 3, RIGHT: 4, PROCESS: 5, EXIT: 6 };
+
+        function generateInorderSteps(root) {
+            const steps = [];
+            function traverse(node) {
+                const val = node ? node.value : null;
+                steps.push(ExecutionStep.call(val, INORDER_LINES.ENTRY));
+                steps.push(ExecutionStep.checkNull(val, INORDER_LINES.NULL_CHECK));
+                if (!node) {
+                    steps.push(ExecutionStep.return(null, INORDER_LINES.NULL_CHECK, true));
+                    return;
+                }
+                steps.push(ExecutionStep.recurseLeft(val, INORDER_LINES.LEFT));
+                traverse(node.left);
+                steps.push(ExecutionStep.processNode(val, INORDER_LINES.PROCESS));
+                steps.push(ExecutionStep.recurseRight(val, INORDER_LINES.RIGHT));
+                traverse(node.right);
+                steps.push(ExecutionStep.return(val, INORDER_LINES.EXIT));
+            }
+            traverse(root);
+            return steps;
+        }
+
+        function generatePreorderSteps(root) {
+            const steps = [];
+            function traverse(node) {
+                const val = node ? node.value : null;
+                steps.push(ExecutionStep.call(val, PREORDER_LINES.ENTRY));
+                steps.push(ExecutionStep.checkNull(val, PREORDER_LINES.NULL_CHECK));
+                if (!node) {
+                    steps.push(ExecutionStep.return(null, PREORDER_LINES.NULL_CHECK, true));
+                    return;
+                }
+                steps.push(ExecutionStep.processNode(val, PREORDER_LINES.PROCESS));
+                steps.push(ExecutionStep.recurseLeft(val, PREORDER_LINES.LEFT));
+                traverse(node.left);
+                steps.push(ExecutionStep.recurseRight(val, PREORDER_LINES.RIGHT));
+                traverse(node.right);
+                steps.push(ExecutionStep.return(val, PREORDER_LINES.EXIT));
+            }
+            traverse(root);
+            return steps;
+        }
+
+        function generatePostorderSteps(root) {
+            const steps = [];
+            function traverse(node) {
+                const val = node ? node.value : null;
+                steps.push(ExecutionStep.call(val, POSTORDER_LINES.ENTRY));
+                steps.push(ExecutionStep.checkNull(val, POSTORDER_LINES.NULL_CHECK));
+                if (!node) {
+                    steps.push(ExecutionStep.return(null, POSTORDER_LINES.NULL_CHECK, true));
+                    return;
+                }
+                steps.push(ExecutionStep.recurseLeft(val, POSTORDER_LINES.LEFT));
+                traverse(node.left);
+                steps.push(ExecutionStep.recurseRight(val, POSTORDER_LINES.RIGHT));
+                traverse(node.right);
+                steps.push(ExecutionStep.processNode(val, POSTORDER_LINES.PROCESS));
+                steps.push(ExecutionStep.return(val, POSTORDER_LINES.EXIT));
+            }
+            traverse(root);
+            return steps;
+        }
+
+        function getTraversalGenerator(type) {
+            switch (type) {
+                case 'preorder': return generatePreorderSteps;
+                case 'postorder': return generatePostorderSteps;
+                default: return generateInorderSteps;
+            }
+        }
+
+        // ============================================================
+        // 8. APPLICATION STATE & CONTROLLER
+        // ============================================================
+
+        const AppController = {
+            traversalType: 'inorder',
+            steps: [],
+            currentStepIndex: -1,
+            callStack: [],
+            isPlaying: false,
+            playInterval: null,
+            animationSpeed: 1500,
+            history: [],
+            outputValues: [],
+
+            init() {
+                this.generateSteps();
+                this.updateUI();
+                this.updateDescription();
+                this.updateOutput();
+            },
+
+            generateSteps() {
+                const generator = getTraversalGenerator(this.traversalType);
+                this.steps = generator(tree);
+                this.updateDescription();
+            },
+
+            getStepDescription(step) {
+                if (!step) return 'Click <strong>Next →</strong> or <strong>▶ Start</strong> to begin the traversal visualization.';
+                
+                const nodeVal = step.nodeValue !== null ? `<span class="node-value">${step.nodeValue}</span>` : '<span class="node-value">null</span>';
+                const funcName = this.traversalType === 'inorder' ? 'inOrder' :
+                                this.traversalType === 'preorder' ? 'preOrder' : 'postOrder';
+                
+                switch (step.type) {
+                    case StepType.CALL:
+                        if (step.nodeValue !== null) {
+                            return `<span class="action-type">📞 CALL:</span> Entering function <strong>${funcName}(${nodeVal})</strong>. A new stack frame is <strong>pushed</strong> onto the call stack.`;
+                        } else {
+                            return `<span class="action-type">📞 CALL:</span> Entering function <strong>${funcName}(null)</strong>. We're checking a null child - this is the base case of recursion.`;
+                        }
+                    
+                    case StepType.CHECK_NULL:
+                        if (step.nodeValue !== null) {
+                            return `<span class="action-type">❓ CHECK:</span> Is node ${nodeVal} null? <strong>No!</strong> We continue with the traversal logic.`;
+                        } else {
+                            return `<span class="action-type">❓ CHECK:</span> Is node null? <strong>Yes!</strong> This is the <strong>base case</strong> - we will return immediately.`;
+                        }
+                    
+                    case StepType.RECURSE_LEFT:
+                        return `<span class="action-type">⬅️ RECURSE LEFT:</span> From node ${nodeVal}, we now recursively call <strong>${funcName}(node.left)</strong>. The current function is <strong>paused</strong> while we explore the left subtree.`;
+                    
+                    case StepType.RECURSE_RIGHT:
+                        return `<span class="action-type">➡️ RECURSE RIGHT:</span> From node ${nodeVal}, we now recursively call <strong>${funcName}(node.right)</strong>. The current function is <strong>paused</strong> while we explore the right subtree.`;
+                    
+                    case StepType.PROCESS_NODE:
+                        return `<span class="action-type">✅ PROCESS:</span> <strong>print(${nodeVal})</strong> - This is when we actually "visit" or output the node value. In ${this.traversalType} traversal, this happens ${this.getProcessTiming()}.`;
+                    
+                    case StepType.RETURN:
+                        if (step.nodeValue !== null) {
+                            return `<span class="action-type">🔙 RETURN:</span> Function <strong>${funcName}(${nodeVal})</strong> is complete! The stack frame is <strong>popped</strong>. Control returns to the caller.`;
+                        } else {
+                            return `<span class="action-type">🔙 RETURN:</span> Returning from null check. The stack frame is <strong>popped</strong>. This is how recursion "unwinds" back up.`;
+                        }
+                    
+                    default:
+                        return step.description || 'Processing...';
+                }
+            },
+
+            getProcessTiming() {
+                switch (this.traversalType) {
+                    case 'inorder': return '<strong>after</strong> the left subtree and <strong>before</strong> the right subtree (Left → Root → Right)';
+                    case 'preorder': return '<strong>before</strong> both subtrees (Root → Left → Right)';
+                    case 'postorder': return '<strong>after</strong> both subtrees (Left → Right → Root)';
+                    default: return '';
+                }
+            },
+
+            updateDescription() {
+                const descEl = document.querySelector('.description-text');
+                const counterEl = document.getElementById('step-counter');
+                
+                if (this.currentStepIndex < 0) {
+                    descEl.innerHTML = this.getStepDescription(null);
+                } else {
+                    const step = this.steps[this.currentStepIndex];
+                    descEl.innerHTML = this.getStepDescription(step);
+                }
+                
+                counterEl.textContent = `Step: ${this.currentStepIndex + 1} / ${this.steps.length}`;
+            },
+
+            updateOutput() {
+                const container = document.getElementById('output-container');
+                if (this.outputValues.length === 0) {
+                    container.innerHTML = '<span class="output-empty">No nodes visited yet</span>';
+                } else {
+                    container.innerHTML = this.outputValues.map(val => 
+                        `<span class="output-value">${val}</span>`
+                    ).join('');
+                }
+            },
+
+            reset() {
+                this.currentStepIndex = -1;
+                this.callStack = [];
+                this.history = [];
+                this.outputValues = [];
+                this.isPlaying = false;
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+                
+                // Reset node states
+                getAllNodes(tree).forEach(node => {
+                    nodeStates.set(node.value, NodeState.UNVISITED);
+                });
+                
+                // Update all renderers
+                treeRenderer.render(tree, nodeStates);
+                codeRenderer.clearHighlight();
+                stackRenderer.clear();
+                this.updateUI();
+                this.updateDescription();
+                this.updateOutput();
+            },
+
+            saveState() {
+                this.history.push({
+                    stepIndex: this.currentStepIndex,
+                    callStack: [...this.callStack],
+                    nodeStates: new Map(nodeStates),
+                    outputValues: [...this.outputValues]
+                });
+            },
+
+            restoreState() {
+                if (this.history.length === 0) return false;
+                const state = this.history.pop();
+                this.currentStepIndex = state.stepIndex;
+                this.callStack = state.callStack;
+                this.outputValues = state.outputValues;
+                
+                // Restore node states
+                state.nodeStates.forEach((value, key) => {
+                    nodeStates.set(key, value);
+                });
+                
+                return true;
+            },
+
+            nextStep() {
+                if (this.currentStepIndex >= this.steps.length - 1) return false;
+                
+                this.saveState();
+                this.currentStepIndex++;
+                const step = this.steps[this.currentStepIndex];
+                
+                // Track output when processing a node
+                if (step.type === StepType.PROCESS_NODE && step.nodeValue !== null) {
+                    this.outputValues.push(step.nodeValue);
+                    this.updateOutput();
+                }
+                
+                // Apply step
+                this.applyStep(step);
+                this.updateUI();
+                this.updateDescription();
+                return true;
+            },
+
+            previousStep() {
+                if (this.currentStepIndex < 0) return false;
+                
+                if (this.restoreState()) {
+                    // Update renderers
+                    treeRenderer.render(tree, nodeStates);
+                    
+                    if (this.currentStepIndex >= 0) {
+                        const step = this.steps[this.currentStepIndex];
+                        codeRenderer.highlightLine(step.codeLine);
+                    } else {
+                        codeRenderer.clearHighlight();
+                    }
+                    
+                    stackRenderer.setStack(this.callStack.map(f => new StackFrame(f.functionName, f.nodeValue, f.returnAddress)));
+                    this.updateUI();
+                    this.updateDescription();
+                    this.updateOutput();
+                    return true;
+                }
+                return false;
+            },
+
+            applyStep(step) {
+                // Update node state
+                if (step.nodeValue !== null) {
+                    nodeStates.set(step.nodeValue, step.nodeState);
+                }
+                
+                // Handle stack action
+                if (step.stackAction === StackAction.PUSH) {
+                    const funcName = this.traversalType === 'inorder' ? 'inOrder' :
+                                    this.traversalType === 'preorder' ? 'preOrder' : 'postOrder';
+                    this.callStack.push({
+                        functionName: funcName,
+                        nodeValue: step.nodeValue,
+                        returnAddress: 'caller'
+                    });
+                } else if (step.stackAction === StackAction.POP && this.callStack.length > 0) {
+                    this.callStack.pop();
+                }
+                
+                // Update renderers
+                treeRenderer.render(tree, nodeStates);
+                codeRenderer.highlightLine(step.codeLine);
+                stackRenderer.setStack(this.callStack.map(f => new StackFrame(f.functionName, f.nodeValue, f.returnAddress)));
+            },
+
+            play() {
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                this.updateUI();
+                
+                this.playInterval = setInterval(() => {
+                    if (!this.nextStep()) {
+                        this.pause();
+                    }
+                }, this.animationSpeed);
+            },
+
+            pause() {
+                this.isPlaying = false;
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+                this.updateUI();
+            },
+
+            setSpeed(speed) {
+                this.animationSpeed = speed;
+                if (this.isPlaying) {
+                    this.pause();
+                    this.play();
+                }
+            },
+
+            setTraversalType(type) {
+                if (type !== this.traversalType) {
+                    this.traversalType = type;
+                    codeRenderer.setTraversalType(type);
+                    this.reset();
+                    this.generateSteps();
+                    this.updateDescription();
+                }
+            },
+
+            updateUI() {
+                const btnPrev = document.getElementById('btn-prev');
+                const btnNext = document.getElementById('btn-next');
+                const btnPlay = document.getElementById('btn-play');
+                
+                btnPrev.disabled = this.currentStepIndex < 0;
+                btnNext.disabled = this.currentStepIndex >= this.steps.length - 1;
+                btnPlay.textContent = this.isPlaying ? '⏸ Pause' : '▶ Start';
+            },
+
+            isAtStart() {
+                return this.currentStepIndex < 0;
+            },
+
+            isAtEnd() {
+                return this.currentStepIndex >= this.steps.length - 1;
+            }
+        };
+
+        // ============================================================
+        // 9. EVENT HANDLERS
+        // ============================================================
+
+        // Control buttons
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            AppController.previousStep();
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            AppController.nextStep();
+        });
+
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (AppController.isPlaying) {
+                AppController.pause();
+            } else {
+                AppController.play();
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            AppController.reset();
+        });
+
+        // Speed slider
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseInt(e.target.value);
+            AppController.setSpeed(speed);
+            speedValue.textContent = `${speed}ms`;
+        });
+
+        // Traversal type selector
+        document.querySelectorAll('input[name="traversal"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                AppController.setTraversalType(e.target.value);
+            });
+        });
+
+        // ============================================================
+        // INITIALIZE APPLICATION
+        // ============================================================
+
+        AppController.init();
+
+        console.log('Tree Traversal Visualizer loaded');
+        console.log('Tree created with', countNodes(tree), 'nodes');
+        console.log('Tree depth:', getTreeDepth(tree));
+        console.log('Generated', AppController.steps.length, 'execution steps');
+    </script>
+</body>
+</html>
